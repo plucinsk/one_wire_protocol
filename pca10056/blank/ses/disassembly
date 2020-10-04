@@ -1,0 +1,418 @@
+    6863        ldr r3, [r4, #4]
+    4909        ldr r1, =0x00003994
+    0400        lsls r0, r0, #16
+    2201        movs r2, #1
+    F0400003    orr r0, r0, #3
+--- main.c -- 145 ------------------------------------------
+for (int i = 0; i < 2; i++)
+{
+NRF_LOG_INFO("data_o[%0d] = %0d", i, *(p + i));
+}
+}
+    B029        add sp, sp, #0xA4
+    E8BD4FF0    pop.w {r4-r11, lr}
+--- main.c -- 147 ------------------------------------------
+NRF_LOG_INFO("data_o[%0d] = %0d", i, *(p + i));
+    F7FEB85B    b.w 0x00000A94 <nrf_log_frontend_std_2>
+    BF00        nop
+    0014        movs r4, r2
+    2000        movs r0, #0
+    3970        subs r1, #0x70
+    0000        movs r0, r0
+    397E        subs r1, #0x7E
+    0000        movs r0, r0
+    06C8        lsls r0, r1, #27
+    2000        movs r0, #0
+    00003994    .word 0x00003994
+    06D8        lsls r0, r3, #27
+    2000        movs r0, #0
+--- main.c -- 126 ------------------------------------------
+if (NRF_TIMER0 -> EVENTS_COMPARE[0])
+    4B0B        ldr r3, =0x40008000
+    F8D32140    ldr.w r2, [r3, #0x140]
+    B192        cbz r2, 0x00002A26
+--- main.c -- 127 ------------------------------------------
+{
+cc0_timeout = true;
+    4A0A        ldr r2, =0x200006C4 <cc0_timeout>
+    2101        movs r1, #1
+    7011        strb r1, [r2]
+--- main.c -- 129 ------------------------------------------
+NRF_TIMER0->EVENTS_COMPARE[0] = 0;
+    2200        movs r2, #0
+    F8C32140    str.w r2, [r3, #0x140]
+--- nrf_gpio.h -- 628 --------------------------------------
+__STATIC_INLINE void nrf_gpio_pin_toggle(uint32_t pin_number)
+{
+NRF_GPIO_Type * reg = nrf_gpio_pin_port_decode(&pin_number);
+uint32_t pins_state = reg->OUT;
+    F04F42A0    mov.w r2, #0x50000000
+    F8D23504    ldr.w r3, [r2, #0x504]
+--- nrf_gpio.h -- 633 --------------------------------------
+reg->OUTSET = (~pins_state & (1UL << pin_number));
+    43D9        mvns r1, r3
+    F0014100    and r1, r1, #0x80000000
+--- nrf_gpio.h -- 635 --------------------------------------
+reg->OUTCLR = (pins_state & (1UL << pin_number));
+    F0034300    and r3, r3, #0x80000000
+--- nrf_gpio.h -- 634 --------------------------------------
+reg->OUTSET = (~pins_state & (1UL << pin_number));
+    F8C21508    str.w r1, [r2, #0x508]
+--- nrf_gpio.h -- 635 --------------------------------------
+reg->OUTCLR = (pins_state & (1UL << pin_number));
+    F8C2350C    str.w r3, [r2, #0x50C]
+--- main.c -- 128 ------------------------------------------
+cc0_timeout = true;
+NRF_TIMER0->EVENTS_COMPARE[0] = 0;
+nrf_gpio_pin_toggle(31);
+}
+}
+    4770        bx lr
+    40008000    .word 0x40008000
+    200006C4    .word 0x200006C4
+--- main.c -- 161 ------------------------------------------
+void set_irq_us (uint32_t irq_time_us)
+{
+cc0_timeout = false;
+NRF_TIMER0 -> TASKS_CAPTURE[0] = 1;
+    4B0D        ldr r3, =0x40008000
+--- main.c -- 164 ------------------------------------------
+cc0_timeout = false;
+    4A0E        ldr r2, =0x200006C4 <cc0_timeout>
+--- main.c -- 163 ------------------------------------------
+{
+    B510        push {r4, lr}
+--- main.c -- 164 ------------------------------------------
+cc0_timeout = false;
+    2100        movs r1, #0
+--- main.c -- 165 ------------------------------------------
+NRF_TIMER0 -> TASKS_CAPTURE[0] = 1;
+    2401        movs r4, #1
+--- main.c -- 164 ------------------------------------------
+cc0_timeout = false;
+    7011        strb r1, [r2]
+--- main.c -- 165 ------------------------------------------
+NRF_TIMER0 -> TASKS_CAPTURE[0] = 1;
+    641C        str r4, [r3, #0x40]
+--- main.c -- 166 ------------------------------------------
+NRF_TIMER0 -> EVENTS_COMPARE[0] = 0;
+    F8C31140    str.w r1, [r3, #0x140]
+--- main.c -- 167 ------------------------------------------
+NRF_TIMER0 -> INTENSET = TIMER_INTENSET_COMPARE0_Msk;
+    F44F3180    mov.w r1, #0x10000
+    F8C31304    str.w r1, [r3, #0x304]
+--- main.c -- 168 ------------------------------------------
+NRF_TIMER0 -> CC[0] += irq_time_us;
+    F8D31540    ldr.w r1, [r3, #0x540]
+    4408        add r0, r1
+    F8C30540    str.w r0, [r3, #0x540]
+--- main.c -- 169 ------------------------------------------
+while(! cc0_timeout)
+    7811        ldrb r1, [r2]
+    B121        cbz r1, 0x00002A62
+--- main.c -- 170 ------------------------------------------
+{
+__WFE();
+}
+NRF_TIMER0 -> INTENCLR = TIMER_INTENCLR_COMPARE0_Msk;
+    F44F3280    mov.w r2, #0x10000
+    F8C32308    str.w r2, [r3, #0x308]
+--- main.c -- 174 ------------------------------------------
+}
+    BD10        pop {r4, pc}
+--- cmsis_gcc.h -- 392 -------------------------------------
+a low-power state until one of a number of events occurs.
+*/
+__attribute__((always_inline)) __STATIC_INLINE void __WFE(void)
+{
+__ASM volatile ("wfe");
+    BF20        wfe
+    E7F6        b 0x00002A54
+    BF00        nop
+    40008000    .word 0x40008000
+    200006C4    .word 0x200006C4
+--- main.c -- 176 ------------------------------------------
+void irq_init(void)
+{
+ret_code_t err_code;
+NRF_CLOCK -> EVENTS_HFCLKSTARTED = 0;
+    F04F4380    mov.w r3, #0x40000000
+    2200        movs r2, #0
+    F8C32100    str.w r2, [r3, #0x100]
+--- main.c -- 181 ------------------------------------------
+NRF_CLOCK -> TASKS_HFCLKSTART = 1;
+    2201        movs r2, #1
+    601A        str r2, [r3]
+--- main.c -- 182 ------------------------------------------
+while (!NRF_CLOCK -> EVENTS_HFCLKSTARTED)
+    F8D32100    ldr.w r2, [r3, #0x100]
+    2A00        cmp r2, #0
+    D0FB        beq 0x00002A7E
+--- main.c -- 183 ------------------------------------------
+{
+}
+NRF_TIMER0 -> MODE = (TIMER_MODE_MODE_Timer << TIMER_MODE_MODE_Pos);
+    4B0E        ldr r3, =0x40008000
+    2200        movs r2, #0
+    F8C32504    str.w r2, [r3, #0x504]
+--- main.c -- 188 ------------------------------------------
+NRF_TIMER0 -> PRESCALER = 4;
+    2204        movs r2, #4
+    F8C32510    str.w r2, [r3, #0x510]
+--- main.c -- 189 ------------------------------------------
+NRF_TIMER0 -> BITMODE = (TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos);
+    2203        movs r2, #3
+    F8C32508    str.w r2, [r3, #0x508]
+--- main.c -- 190 ------------------------------------------
+NRF_TIMER0 -> INTENCLR = ~0;
+    F04F32FF    mov.w r2, #0xFFFFFFFF
+    F8C32308    str.w r2, [r3, #0x308]
+--- main.c -- 192 ------------------------------------------
+NRF_TIMER0 -> INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
+    F44F3280    mov.w r2, #0x10000
+    F8C32304    str.w r2, [r3, #0x304]
+--- core_cm4.h -- 1670 -------------------------------------
+\param [in] IRQn External interrupt number. Value cannot be negative.
+*/
+__STATIC_INLINE void NVIC_ClearPendingIRQ(IRQn_Type IRQn)
+{
+NVIC->ICPR[(((uint32_t)(int32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)(int32_t)IRQn) & 0x1FUL));
+    4A06        ldr r2, =0xE000E100
+    F44F7180    mov.w r1, #0x100
+    F8C21180    str.w r1, [r2, #0x180]
+--- core_cm4.h -- 1628 -------------------------------------
+NVIC->ISER[(((uint32_t)(int32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)(int32_t)IRQn) & 0x1FUL));
+    6011        str r1, [r2]
+--- main.c -- 192 ------------------------------------------
+NRF_TIMER0 -> INTENSET = (TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos);
+NVIC_ClearPendingIRQ(TIMER0_IRQn);
+NVIC_EnableIRQ(TIMER0_IRQn);
+NRF_TIMER0 -> TASKS_CLEAR = 1;
+    2201        movs r2, #1
+    60DA        str r2, [r3, #12]
+--- main.c -- 197 ------------------------------------------
+NRF_TIMER0 -> TASKS_START = 1;
+    601A        str r2, [r3]
+--- main.c -- 198 ------------------------------------------
+}
+    4770        bx lr
+    BF00        nop
+    40008000    .word 0x40008000
+    E000E100    .word 0xE000E100
+--- main.c -- 284 ------------------------------------------
+nrf_drv_ppi_channel_enable(m_ppi_channel2);
+}
+int main(void)
+{
+    B57F        push {r0-r6, lr}
+--- main.c -- 289 ------------------------------------------
+static bool pressed = false;
+ret_code_t err_code;
+err_code = NRF_LOG_INIT(NULL);
+    F44F4100    mov.w r1, #0x8000
+    2000        movs r0, #0
+    F7FDFE0A    bl 0x000006E8 <nrf_log_init>
+--- main.c -- 292 ------------------------------------------
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002ADA
+--- main.c -- 292 ------------------------------------------
+APP_ERROR_CHECK(err_code);
+    F7FEF9A8    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 293 ------------------------------------------
+bsp_board_init(BSP_INIT_LEDS);
+    2001        movs r0, #1
+    F7FEF986    bl 0x00000DEC <bsp_board_init>
+--- main.c -- 294 ------------------------------------------
+NRF_LOG_DEFAULT_BACKENDS_INIT();
+    F7FDFD2C    bl 0x0000053C <nrf_log_default_backends_init>
+--- main.c -- 206 ------------------------------------------
+timer1_cfg.frequency = NRF_TIMER_FREQ_1MHz;
+    2304        movs r3, #4
+--- main.c -- 205 ------------------------------------------
+timer1_cfg.mode = NRF_TIMER_MODE_TIMER;
+    2400        movs r4, #0
+--- main.c -- 206 ------------------------------------------
+timer1_cfg.frequency = NRF_TIMER_FREQ_1MHz;
+    F88D3008    strb.w r3, [sp, #8]
+--- main.c -- 207 ------------------------------------------
+timer1_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
+err_code = nrf_drv_timer_init(&m_timer1, &timer1_cfg, timer1_event_handler);
+    4A4E        ldr r2, =0x000028D1
+    484F        ldr r0, =0x00003960 <m_timer1>
+--- main.c -- 205 ------------------------------------------
+timer1_cfg.mode = NRF_TIMER_MODE_TIMER;
+    F88D4009    strb.w r4, [sp, #9]
+--- main.c -- 206 ------------------------------------------
+timer1_cfg.frequency = NRF_TIMER_FREQ_1MHz;
+timer1_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
+    2303        movs r3, #3
+--- main.c -- 208 ------------------------------------------
+err_code = nrf_drv_timer_init(&m_timer1, &timer1_cfg, timer1_event_handler);
+    A902        add r1, sp, #8
+--- main.c -- 207 ------------------------------------------
+timer1_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
+    F88D300A    strb.w r3, [sp, #10]
+--- main.c -- 208 ------------------------------------------
+err_code = nrf_drv_timer_init(&m_timer1, &timer1_cfg, timer1_event_handler);
+    F7FEFED2    bl 0x000018A4 <nrfx_timer_init>
+--- main.c -- 210 ------------------------------------------
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002B06
+    F7FEF992    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 211 ------------------------------------------
+nrf_drv_timer_enable(&m_timer1);
+    4849        ldr r0, =0x00003960 <m_timer1>
+    F7FEFF3A    bl 0x00001980 <nrfx_timer_enable>
+--- main.c -- 215 ------------------------------------------
+static void timer2_init(void)
+{
+ret_code_t err_code;
+nrf_drv_timer_config_t timer2_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
+    2307        movs r3, #7
+    F88D4008    strb.w r4, [sp, #8]
+    9403        str r4, [sp, #12]
+--- main.c -- 220 ------------------------------------------
+timer2_cfg.mode = NRF_TIMER_MODE_COUNTER;
+timer2_cfg.bit_width = NRF_TIMER_BIT_WIDTH_8;
+err_code = nrf_drv_timer_init(&m_timer2, &timer2_cfg, timer2_event_handler);
+    4A46        ldr r2, =0x000028F9
+    4847        ldr r0, =0x00003968 <m_timer2>
+--- main.c -- 219 ------------------------------------------
+nrf_drv_timer_config_t timer2_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
+    F88D300B    strb.w r3, [sp, #11]
+--- main.c -- 220 ------------------------------------------
+timer2_cfg.mode = NRF_TIMER_MODE_COUNTER;
+    2401        movs r4, #1
+--- main.c -- 221 ------------------------------------------
+timer2_cfg.bit_width = NRF_TIMER_BIT_WIDTH_8;
+err_code = nrf_drv_timer_init(&m_timer2, &timer2_cfg, timer2_event_handler);
+    A902        add r1, sp, #8
+--- main.c -- 220 ------------------------------------------
+timer2_cfg.mode = NRF_TIMER_MODE_COUNTER;
+    F88D4009    strb.w r4, [sp, #9]
+--- main.c -- 221 ------------------------------------------
+timer2_cfg.bit_width = NRF_TIMER_BIT_WIDTH_8;
+    F88D400A    strb.w r4, [sp, #10]
+--- main.c -- 222 ------------------------------------------
+err_code = nrf_drv_timer_init(&m_timer2, &timer2_cfg, timer2_event_handler);
+    F7FEFEBC    bl 0x000018A4 <nrfx_timer_init>
+--- main.c -- 224 ------------------------------------------
+nrf_drv_timer_extended_compare(&m_timer2,
+    4623        mov r3, r4
+    2228        movs r2, #0x28
+    2100        movs r1, #0
+    4840        ldr r0, =0x00003968 <m_timer2>
+    9400        str r4, [sp]
+    F7FEFF4A    bl 0x000019CE <nrfx_timer_extended_compare>
+--- main.c -- 227 ------------------------------------------
+NUMBER_OF_SAMPLES,
+NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
+true);
+nrf_drv_timer_enable(&m_timer2);
+    483E        ldr r0, =0x00003968 <m_timer2>
+    F7FEFF20    bl 0x00001980 <nrfx_timer_enable>
+--- main.c -- 256 ------------------------------------------
+static void ppi_init(void)
+{
+ret_code_t err_code;
+err_code = nrf_drv_ppi_init();
+    F7FEFCEE    bl 0x00001520 <nrf_drv_ppi_init>
+--- main.c -- 261 ------------------------------------------
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002B4A
+    F7FEF970    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 262 ------------------------------------------
+err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel1);
+    483B        ldr r0, =0x200006D0 <m_ppi_channel1>
+    F7FEFD64    bl 0x00001618 <nrfx_ppi_channel_alloc>
+--- main.c -- 264 ------------------------------------------
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002B56
+    F7FEF96A    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 265 ------------------------------------------
+err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel2);
+    4839        ldr r0, =0x200006D1 <m_ppi_channel2>
+    F7FEFD5E    bl 0x00001618 <nrfx_ppi_channel_alloc>
+--- main.c -- 267 ------------------------------------------
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002B62
+    F7FEF964    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 268 ------------------------------------------
+err_code = nrf_drv_ppi_channel_assign(m_ppi_channel1,
+    4C35        ldr r4, =0x200006D0 <m_ppi_channel1>
+    201F        movs r0, #31
+    7825        ldrb r5, [r4]
+    F7FFFDD0    bl 0x0000270C <nrfx_gpiote_in_event_addr_get>
+    4A34        ldr r2, =0x4000A008
+    4601        mov r1, r0
+    4628        mov r0, r5
+    F7FEFD9D    bl 0x000016B0 <nrfx_ppi_channel_assign>
+    4625        mov r5, r4
+--- main.c -- 270 ------------------------------------------
+nrf_drv_gpiote_in_event_addr_get(ONE_WIRE_PIN),
+nrf_drv_timer_task_address_get(&m_timer2, NRF_TIMER_TASK_COUNT));
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002B7E
+    F7FEF956    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 273 ------------------------------------------
+err_code = nrf_drv_ppi_channel_assign(m_ppi_channel2,
+    4C2F        ldr r4, =0x200006D1 <m_ppi_channel2>
+    201F        movs r0, #31
+    7826        ldrb r6, [r4]
+    F7FFFDC2    bl 0x0000270C <nrfx_gpiote_in_event_addr_get>
+    4A2E        ldr r2, =0x40009040
+    4601        mov r1, r0
+    4630        mov r0, r6
+    F7FEFD8F    bl 0x000016B0 <nrfx_ppi_channel_assign>
+--- main.c -- 275 ------------------------------------------
+nrf_drv_gpiote_in_event_addr_get(ONE_WIRE_PIN),
+nrf_drv_timer_task_address_get(&m_timer1, NRF_TIMER_TASK_CAPTURE0));
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002B98
+    F7FEF949    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 278 ------------------------------------------
+err_code = nrf_drv_ppi_channel_fork_assign(m_ppi_channel2,
+    492B        ldr r1, =0x4000900C
+    7820        ldrb r0, [r4]
+    F7FEFDCA    bl 0x00001734 <nrfx_ppi_channel_fork_assign>
+--- main.c -- 280 ------------------------------------------
+nrf_drv_timer_task_address_get(&m_timer1, NRF_TIMER_TASK_CLEAR));
+APP_ERROR_CHECK(err_code);
+    B108        cbz r0, 0x00002BA6
+    F7FEF942    bl 0x00000E2A <app_error_handler_bare>
+--- main.c -- 282 ------------------------------------------
+nrf_drv_ppi_channel_enable(m_ppi_channel1);
+    7828        ldrb r0, [r5]
+    F7FEFDFE    bl 0x000017A8 <nrfx_ppi_channel_enable>
+--- main.c -- 284 ------------------------------------------
+nrf_drv_ppi_channel_enable(m_ppi_channel2);
+    7820        ldrb r0, [r4]
+--- main.c -- 246 ------------------------------------------
+err_code = nrf_drv_gpiote_in_init(ONE_WIRE_PIN, &configH2L, gpiote_event_handler);
+    4C27        ldr r4, =0x000028D5
+--- main.c -- 280 ------------------------------------------
+nrf_drv_timer_task_address_get(&m_timer1, NRF_TIMER_TASK_CLEAR));
+APP_ERROR_CHECK(err_code);
+nrf_drv_ppi_channel_enable(m_ppi_channel1);
+nrf_drv_ppi_channel_enable(m_ppi_channel2);
+    F7FEFDFA    bl 0x000017A8 <nrfx_ppi_channel_enable>
+--- main.c -- 295 ------------------------------------------
+timer1_init();
+timer2_init();
+ppi_init();
+bsp_board_init(BSP_INIT_BUTTONS);
+    2002        movs r0, #2
+    F7FEF919    bl 0x00000DEC <bsp_board_init>
+--- nrf_gpio.h -- 501 --------------------------------------
+nrf_gpio_pin_sense_t sense)
+{
+NRF_GPIO_Type * reg = nrf_gpio_pin_port_decode(&pin_number);
+reg->PIN_CNF[pin_number] = ((uint32_t)dir << GPIO_PIN_CNF_DIR_Pos)
+    F04F43A0    mov.w r3, #0x50000000
+    2203        movs r2, #3
+    F8C3277C    str.w r2, [r3, #0x77C]
+--- nrf_gpio.h -- 717 --------------------------------------
+__STATIC_INLINE void nrf_gpio_port_out_set(NRF_GPIO_Type * p_reg, uint32_t set_mask)
+{
+p_reg->OUTSET = set_mask;
+    F04F4200    mov.w r2, #0x80000000

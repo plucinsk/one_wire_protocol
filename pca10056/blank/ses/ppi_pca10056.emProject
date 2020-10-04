@@ -57,6 +57,7 @@
       <file file_name="../../../../../../external/fprintf/nrf_fprintf_format.c" />
       <file file_name="../../../../../../components/libraries/experimental_memobj/nrf_memobj.c" />
       <file file_name="../../../../../../components/libraries/strerror/nrf_strerror.c" />
+      <file file_name="../../../../../../components/libraries/timer/app_timer.c" />
     </folder>
     <folder Name="nRF_Drivers">
       <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_ppi.c" />
@@ -67,6 +68,7 @@
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_uart.c" />
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_uarte.c" />
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_gpiote.c" />
+      <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_clock.c" />
     </folder>
     <folder Name="Application">
       <file file_name="../../../main.c" />

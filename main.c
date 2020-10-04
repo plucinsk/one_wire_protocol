@@ -50,50 +50,111 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "nrf.h"
+//#include "nrf_drv_clock.h"
 #include "nrf_drv_timer.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_gpiote.h"
 #include "bsp.h"
 #include "boards.h"
 #include "app_error.h"
+//#include "app_timer.h"
 #include "nrf_gpio.h"
+//#include "nrf_delay.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#define ONE_WIRE_PIN BSP_BUTTON_0
+#define ONE_WIRE_PIN 31
+#define NUMBER_OF_SAMPLES 40
 
-static int timing[42];
 static int number_of_events = 0;
-
-typedef enum
-{
-  /*** HOST PART ***/
-  RSTL_us           = 1000,
-  RSTH_us           = 30,
-  /*** SENSOR PART ***/
-  RESPL_us          = 80,
-  RESPH_us          = 80,
-  BITL_us           = 50,
-  BIT0H_us          = 26,
-  BIT1H_us          = 70,
-  END_us            = 50,
-  SAMPLING_RATE_us  = 10
-} one_wire_t;
-
+static int timing_array[NUMBER_OF_SAMPLES];
 volatile bool cc0_timeout;
+
+//APP_TIMER_DEF(m_timer_id);
+//#define TIMER_INTERVAL APP_TIMER_TICKS(3000) //3000 ms intervals
+
 static const nrf_drv_timer_t m_timer1 = NRF_DRV_TIMER_INSTANCE(1);
 static const nrf_drv_timer_t m_timer2 = NRF_DRV_TIMER_INSTANCE(2);
 static nrf_ppi_channel_t m_ppi_channel1;
 static nrf_ppi_channel_t m_ppi_channel2;
+
+/*static void timer_timeout_handler(void * p_context)
+{
+  if (number_of_events == 0 || number_of_events == NUMBER_OF_SAMPLES)
+  {
+    NRF_LOG_INFO("got here! number_of_events = %0d", number_of_events);
+    set_irq_us(1000);
+    set_irq_us(1000);
+    set_irq_us(80);
+    //gpiote_init();
+    //ppi_init();
+  }
+  else
+  {
+    NRF_LOG_INFO("number_of_events = %0d", number_of_events);
+    nrf_drv_timer_clear(&m_timer2);
+    NRF_LOG_INFO("COUNTER CLEARED!");
+  }
+}*/
+
+/*static void timer_init(void)
+{
+  ret_code_t err_code;
+  err_code = app_timer_init();
+  APP_ERROR_CHECK(err_code);
+
+  app_timer_create(&m_timer_id, APP_TIMER_MODE_REPEATED, timer_timeout_handler);
+}*/
+
+static int * calculate_humidity_and_temperature( int *input_arr)
+{
+  int arr[NUMBER_OF_SAMPLES];
+  static int data_o[2];
+  static int crc;
+
+  for(int i = 0; i < NUMBER_OF_SAMPLES; i++)
+  {
+    arr[i] = *input_arr;
+    if (arr[i] > 100 && arr[i] < 150)
+    {
+      arr[i] = 1;
+    } 
+    else 
+    {
+      arr[i] = 0;
+    }
+    input_arr++;
+  }
+
+  for(int j = 0; j < 16; j++)
+  {
+    data_o[0] += arr[j]       * (0x8000 >> j);
+    data_o[1] += arr[j+16]    * (0x8000 >> j);
+  }
+
+  for (int k = 0; k < 8; k++)
+  {
+    crc += arr[k + 32] * (0x80 >> k);
+  }
+
+  if (!((( ((data_o[0] & 0xFF00) >> 8) + (data_o[0] & 0x00FF) + ((data_o[1] & 0xFF00) >> 8) + (data_o[1] & 0x00FF)) & crc) == crc))
+  {
+    data_o[0] = 0xDEAD;
+    data_o[1] = 0xBEEF;
+  }
+
+  return data_o;
+}
 
 void TIMER0_IRQHandler(void)
 {
   if (NRF_TIMER0 -> EVENTS_COMPARE[0])
   {
     cc0_timeout = true;
-    nrf_gpio_pin_toggle(13);
+    NRF_TIMER0->EVENTS_COMPARE[0] = 0;
+    nrf_gpio_pin_toggle(ONE_WIRE_PIN);
   }
 }
 
@@ -103,24 +164,26 @@ static void timer1_event_handler(nrf_timer_event_t event_type, void * p_context)
 
 static void timer2_event_handler(nrf_timer_event_t event_type, void * p_context)
 {
+  int * p;
   NRF_LOG_INFO("Limit Reached");
+  nrf_drv_gpiote_uninit();
+  bsp_board_led_invert(2);
+  p = calculate_humidity_and_temperature(timing_array);
+  for (int i = 0; i < 2; i++)
+  {
+    NRF_LOG_INFO("data_o[%0d] = %0d", i, *(p + i));
+  }
 }
 
 static void gpiote_event_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t polarity)
 {
-  number_of_events++;
-  NRF_LOG_INFO("number_of_events = %0d", number_of_events);
-  nrf_drv_gpiote_out_toggle(13);
-  /*timing[number_of_events] = nrf_drv_timer_capture_get(&m_timer1, NRF_TIMER_CC_CHANNEL0);
-  NRF_LOG_INFO("timing[%0d] = %0d", number_of_events, timing[number_of_events]);
-  number_of_events++;
+  int captured_time;
 
-  if(number_of_events == 42)
-  {
-    nrf_drv_gpiote_in_event_disable(ONE_WIRE_PIN);
-    nrf_drv_timer_disable(&m_timer1);
-    number_of_events = 0;
-  }*/
+  number_of_events++;
+  //NRF_LOG_INFO("number_of_events = %0d", number_of_events);
+  captured_time = nrf_drv_timer_capture_get(&m_timer1, NRF_TIMER_CC_CHANNEL0);
+  timing_array[number_of_events - 1] = captured_time;
+  //NRF_LOG_INFO("timing_array[%0d] = %0d", number_of_events - 1, timing_array[number_of_events -1]);
 }
 
 void set_irq_us (uint32_t irq_time_us)
@@ -188,7 +251,7 @@ static void timer2_init(void)
 
   nrf_drv_timer_extended_compare(&m_timer2,
                                    NRF_TIMER_CC_CHANNEL0,
-                                   5,
+                                   NUMBER_OF_SAMPLES,
                                    NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
                                    true);
 
@@ -199,25 +262,18 @@ static void gpiote_init(void)
 {
   ret_code_t err_code;
 
-  nrf_drv_gpiote_out_config_t config_out = GPIOTE_CONFIG_OUT_SIMPLE(false);
   nrf_drv_gpiote_in_config_t configH2L = NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
-
-  //configH2L.hi_accuracy = true;
-  //configH2L.is_watcher = false;
   configH2L.pull = NRF_GPIO_PIN_PULLUP;
-  //configH2L.sense = NRF_GPIOTE_POLARITY_TOGGLE;
+
+  nrf_drv_gpiote_uninit();
 
   err_code = nrf_drv_gpiote_init();
   APP_ERROR_CHECK(err_code);
-
+  
   err_code = nrf_drv_gpiote_in_init(ONE_WIRE_PIN, &configH2L, gpiote_event_handler);
   APP_ERROR_CHECK(err_code);
 
-  err_code = nrf_drv_gpiote_out_init(13, &config_out);
-  APP_ERROR_CHECK(err_code);
-
   nrf_drv_gpiote_in_event_enable(ONE_WIRE_PIN, true);
-  //nrf_drv_gpiote_out_task_enable(13);
 }
 
 static void ppi_init(void)
@@ -230,46 +286,60 @@ static void ppi_init(void)
   err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel1);
   APP_ERROR_CHECK(err_code);
 
-  //err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel2);
-  //APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel2);
+  APP_ERROR_CHECK(err_code);
 
   err_code = nrf_drv_ppi_channel_assign(m_ppi_channel1, 
                                         nrf_drv_gpiote_in_event_addr_get(ONE_WIRE_PIN), 
-                                        nrf_drv_gpiote_out_task_addr_get(13));
+                                        nrf_drv_timer_task_address_get(&m_timer2, NRF_TIMER_TASK_COUNT));
   APP_ERROR_CHECK(err_code);
 
-  //err_code = nrf_drv_ppi_channel_fork_assign(m_ppi_channel1, nrf_drv_timer_task_address_get(&m_timer1, NRF_TIMER_TASK_CLEAR));
-  //APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_ppi_channel_assign(m_ppi_channel2,
+                                        nrf_drv_gpiote_in_event_addr_get(ONE_WIRE_PIN),
+                                        nrf_drv_timer_task_address_get(&m_timer1, NRF_TIMER_TASK_CAPTURE0));
+  APP_ERROR_CHECK(err_code);
 
-  //err_code = nrf_drv_ppi_channel_assign(m_ppi_channel2,
-                                        //nrf_drv_gpiote_in_event_addr_get(ONE_WIRE_PIN),
-                                        //nrf_drv_timer_task_address_get(&m_timer2, NRF_TIMER_TASK_COUNT));
-  //APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_ppi_channel_fork_assign(m_ppi_channel2, 
+                                             nrf_drv_timer_task_address_get(&m_timer1, NRF_TIMER_TASK_CLEAR));
+  APP_ERROR_CHECK(err_code);
 
-  
+  nrf_drv_ppi_channel_enable(m_ppi_channel1);
+  nrf_drv_ppi_channel_enable(m_ppi_channel2);
 }
 
 int main(void)
 {
+  bool pressed = false;
   ret_code_t err_code;
-  static int count = 0;
+
   err_code = NRF_LOG_INIT(NULL);
   APP_ERROR_CHECK(err_code);
 
+  bsp_board_init(BSP_INIT_LEDS);
+  bsp_board_init(BSP_INIT_BUTTONS);
   NRF_LOG_DEFAULT_BACKENDS_INIT();
-  gpiote_init();
-  //ppi_init();
-  //timer1_init();
-  //timer2_init();
+  timer1_init();
+  timer2_init();
+  //timer_init();
   
-
+  nrf_gpio_cfg_output(ONE_WIRE_PIN);
+  nrf_gpio_pin_set(ONE_WIRE_PIN);
+  irq_init();
+  ppi_init();
 
   while (1)
   {
-    if (count != number_of_events)
+    if(!pressed)
     {
-      count = number_of_events;
-      NRF_LOG_INFO("count = %0d", count);
+      if(bsp_board_button_state_get(0))
+      {
+        bsp_board_led_invert(0);
+        set_irq_us(1000);
+        set_irq_us(1000);
+        set_irq_us(80);
+        gpiote_init();
+        pressed = true;
+      }
     }
   }
 }
