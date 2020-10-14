@@ -50,83 +50,90 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "nrf.h"
-//#include "nrf_drv_clock.h"
+#include "nrf_drv_clock.h"
 #include "nrf_drv_timer.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_gpiote.h"
 #include "bsp.h"
 #include "boards.h"
 #include "app_error.h"
-//#include "app_timer.h"
+#include "app_timer.h"
 #include "nrf_gpio.h"
-//#include "nrf_delay.h"
+#include "nrf_delay.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
 #define ONE_WIRE_PIN 31
-#define NUMBER_OF_SAMPLES 40
+#define NUMBER_OF_SAMPLES 41
 
 static int number_of_events = 0;
 static int timing_array[NUMBER_OF_SAMPLES];
 volatile bool cc0_timeout;
 
-//APP_TIMER_DEF(m_timer_id);
-//#define TIMER_INTERVAL APP_TIMER_TICKS(3000) //3000 ms intervals
+APP_TIMER_DEF(m_timer_id);
+#define TIMER_INTERVAL APP_TIMER_TICKS(5000) //3000 ms intervals
 
 static const nrf_drv_timer_t m_timer1 = NRF_DRV_TIMER_INSTANCE(1);
 static const nrf_drv_timer_t m_timer2 = NRF_DRV_TIMER_INSTANCE(2);
 static nrf_ppi_channel_t m_ppi_channel1;
 static nrf_ppi_channel_t m_ppi_channel2;
 
-/*static void timer_timeout_handler(void * p_context)
+static void timer_timeout_handler(void * p_context)
 {
   if (number_of_events == 0 || number_of_events == NUMBER_OF_SAMPLES)
   {
-    NRF_LOG_INFO("got here! number_of_events = %0d", number_of_events);
     set_irq_us(1000);
     set_irq_us(1000);
     set_irq_us(80);
-    //gpiote_init();
-    //ppi_init();
+    bsp_board_led_invert(3);
+    gpiote_init();
   }
   else
   {
     NRF_LOG_INFO("number_of_events = %0d", number_of_events);
     nrf_drv_timer_clear(&m_timer2);
-    NRF_LOG_INFO("COUNTER CLEARED!");
-  }
-}*/
+    number_of_events = 0;
+    nrf_drv_gpiote_uninit();
+    bsp_board_led_invert(1);
+    nrf_gpio_cfg_output(ONE_WIRE_PIN);
+    nrf_gpio_pin_set(ONE_WIRE_PIN);
+    memset(timing_array, 0, sizeof timing_array);
+   }
+}
 
-/*static void timer_init(void)
+static void timer_init(void)
 {
   ret_code_t err_code;
   err_code = app_timer_init();
   APP_ERROR_CHECK(err_code);
 
   app_timer_create(&m_timer_id, APP_TIMER_MODE_REPEATED, timer_timeout_handler);
-}*/
+}
 
 static int * calculate_humidity_and_temperature( int *input_arr)
 {
-  int arr[NUMBER_OF_SAMPLES];
+  int arr[NUMBER_OF_SAMPLES-1];
   static int data_o[2];
   static int crc;
 
-  for(int i = 0; i < NUMBER_OF_SAMPLES; i++)
+  for(int i = 1; i < NUMBER_OF_SAMPLES; i++)
   {
-    arr[i] = *input_arr;
-    if (arr[i] > 100 && arr[i] < 150)
+    arr[i-1] = *(input_arr+i);
+    //NRF_LOG_INFO("arr[%0d] = %0d", i - 1, arr[i-1]);
+    if (arr[i-1] > 100 && arr[i-1] < 150)
     {
-      arr[i] = 1;
+      arr[i-1] = 1;
     } 
     else 
     {
-      arr[i] = 0;
+      arr[i-1] = 0;
     }
-    input_arr++;
   }
+  
+  data_o[0] = 0;
+  data_o[1] = 0;
 
   for(int j = 0; j < 16; j++)
   {
@@ -134,10 +141,18 @@ static int * calculate_humidity_and_temperature( int *input_arr)
     data_o[1] += arr[j+16]    * (0x8000 >> j);
   }
 
+  //NRF_LOG_INFO("HUMID = %0d", data_o[0]);
+  //NRF_LOG_INFO("TEMP = %0d", data_o[1]);
+
+  crc = 0;
+
   for (int k = 0; k < 8; k++)
   {
     crc += arr[k + 32] * (0x80 >> k);
   }
+
+  //NRF_LOG_INFO("CRC = %0d", crc);
+
 
   if (!((( ((data_o[0] & 0xFF00) >> 8) + (data_o[0] & 0x00FF) + ((data_o[1] & 0xFF00) >> 8) + (data_o[1] & 0x00FF)) & crc) == crc))
   {
@@ -160,6 +175,7 @@ void TIMER0_IRQHandler(void)
 
 static void timer1_event_handler(nrf_timer_event_t event_type, void * p_context)
 {
+
 }
 
 static void timer2_event_handler(nrf_timer_event_t event_type, void * p_context)
@@ -169,10 +185,13 @@ static void timer2_event_handler(nrf_timer_event_t event_type, void * p_context)
   nrf_drv_gpiote_uninit();
   bsp_board_led_invert(2);
   p = calculate_humidity_and_temperature(timing_array);
-  for (int i = 0; i < 2; i++)
-  {
-    NRF_LOG_INFO("data_o[%0d] = %0d", i, *(p + i));
-  }
+
+  NRF_LOG_INFO("HUMIDITY = %0d", *p);
+  NRF_LOG_INFO("TEMPERATURE = %0d", *(p + 1));
+
+  nrf_gpio_cfg_output(ONE_WIRE_PIN);
+  nrf_gpio_pin_set(ONE_WIRE_PIN);
+  memset(timing_array, 0, sizeof timing_array);
 }
 
 static void gpiote_event_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t polarity)
@@ -180,10 +199,12 @@ static void gpiote_event_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t
   int captured_time;
 
   number_of_events++;
-  //NRF_LOG_INFO("number_of_events = %0d", number_of_events);
   captured_time = nrf_drv_timer_capture_get(&m_timer1, NRF_TIMER_CC_CHANNEL0);
   timing_array[number_of_events - 1] = captured_time;
-  //NRF_LOG_INFO("timing_array[%0d] = %0d", number_of_events - 1, timing_array[number_of_events -1]);
+  if(number_of_events == NUMBER_OF_SAMPLES)
+  {
+    number_of_events = 0;
+  }
 }
 
 void set_irq_us (uint32_t irq_time_us)
@@ -207,6 +228,13 @@ void irq_init(void)
   NRF_CLOCK -> EVENTS_HFCLKSTARTED = 0;
   NRF_CLOCK -> TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK -> EVENTS_HFCLKSTARTED)
+  {
+
+  }
+
+  NRF_CLOCK -> EVENTS_LFCLKSTARTED = 0;
+  NRF_CLOCK -> TASKS_LFCLKSTART = 1;
+  while (!NRF_CLOCK -> EVENTS_LFCLKSTARTED)
   {
 
   }
@@ -258,7 +286,7 @@ static void timer2_init(void)
   nrf_drv_timer_enable(&m_timer2);
 }
 
-static void gpiote_init(void)
+void gpiote_init(void)
 {
   ret_code_t err_code;
 
@@ -320,7 +348,7 @@ int main(void)
   NRF_LOG_DEFAULT_BACKENDS_INIT();
   timer1_init();
   timer2_init();
-  //timer_init();
+  timer_init();
   
   nrf_gpio_cfg_output(ONE_WIRE_PIN);
   nrf_gpio_pin_set(ONE_WIRE_PIN);
@@ -334,10 +362,8 @@ int main(void)
       if(bsp_board_button_state_get(0))
       {
         bsp_board_led_invert(0);
-        set_irq_us(1000);
-        set_irq_us(1000);
-        set_irq_us(80);
-        gpiote_init();
+        err_code = app_timer_start(m_timer_id, TIMER_INTERVAL, NULL);
+        APP_ERROR_CHECK(err_code);
         pressed = true;
       }
     }
