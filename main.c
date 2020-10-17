@@ -67,13 +67,29 @@
 
 #define ONE_WIRE_PIN 31
 #define NUMBER_OF_SAMPLES 41
+#define NUMBER_OF_SAMPLES_PER_MEASURE 16
+#define NUMBER_OF_SAMPLES_PER_CRC 8
+#define TEMPERATURE_START_BIT 16
+#define CRC_START_BIT 32
+#define SAMPLE_MASK 0x8000
+#define CRC_MASK 0x80
+#define MSB_MASK 0xFF00
+#define LSB_MASK 0x00FF
+#define SHIFT_TO_LSB 8
+#define MIN_LOGIC_1_HIGH_TIME 100
+#define MAX_LOGIC_1_HIGH_TIME 150
+#define TIMER_INTERVAL APP_TIMER_TICKS(5000) //5000 ms intervals
+#define RESET 1000
+#define START 1000
+#define RELEASE_MASTER 80
+
+#define DEBUG_MODE 1
+
+APP_TIMER_DEF(m_timer_id);
 
 static int number_of_events = 0;
 static int timing_array[NUMBER_OF_SAMPLES];
 volatile bool cc0_timeout;
-
-APP_TIMER_DEF(m_timer_id);
-#define TIMER_INTERVAL APP_TIMER_TICKS(5000) //3000 ms intervals
 
 static const nrf_drv_timer_t m_timer1 = NRF_DRV_TIMER_INSTANCE(1);
 static const nrf_drv_timer_t m_timer2 = NRF_DRV_TIMER_INSTANCE(2);
@@ -84,15 +100,17 @@ static void timer_timeout_handler(void * p_context)
 {
   if (number_of_events == 0 || number_of_events == NUMBER_OF_SAMPLES)
   {
-    set_irq_us(1000);
-    set_irq_us(1000);
-    set_irq_us(80);
+    set_irq_us(RESET);
+    set_irq_us(START);
+    set_irq_us(RELEASE_MASTER);
     bsp_board_led_invert(3);
     gpiote_init();
   }
   else
   {
-    NRF_LOG_INFO("number_of_events = %0d", number_of_events);
+    #ifdef DEBUG_MODE
+      NRF_LOG_INFO("number_of_events = %0d", number_of_events);
+    #endif
     nrf_drv_timer_clear(&m_timer2);
     number_of_events = 0;
     nrf_drv_gpiote_uninit();
@@ -121,8 +139,7 @@ static int * calculate_humidity_and_temperature( int *input_arr)
   for(int i = 1; i < NUMBER_OF_SAMPLES; i++)
   {
     arr[i-1] = *(input_arr+i);
-    //NRF_LOG_INFO("arr[%0d] = %0d", i - 1, arr[i-1]);
-    if (arr[i-1] > 100 && arr[i-1] < 150)
+    if (arr[i-1] > MIN_LOGIC_1_HIGH_TIME && arr[i-1] < MAX_LOGIC_1_HIGH_TIME)
     {
       arr[i-1] = 1;
     } 
@@ -135,26 +152,20 @@ static int * calculate_humidity_and_temperature( int *input_arr)
   data_o[0] = 0;
   data_o[1] = 0;
 
-  for(int j = 0; j < 16; j++)
+  for(int j = 0; j < NUMBER_OF_SAMPLES_PER_MEASURE; j++)
   {
-    data_o[0] += arr[j]       * (0x8000 >> j);
-    data_o[1] += arr[j+16]    * (0x8000 >> j);
+    data_o[0] += arr[j] * (SAMPLE_MASK >> j);
+    data_o[1] += arr[j + TEMPERATURE_START_BIT] * (SAMPLE_MASK >> j);
   }
-
-  //NRF_LOG_INFO("HUMID = %0d", data_o[0]);
-  //NRF_LOG_INFO("TEMP = %0d", data_o[1]);
 
   crc = 0;
 
-  for (int k = 0; k < 8; k++)
+  for (int k = 0; k < NUMBER_OF_SAMPLES_PER_CRC; k++)
   {
-    crc += arr[k + 32] * (0x80 >> k);
+    crc += arr[k + CRC_START_BIT] * (CRC_MASK >> k);
   }
 
-  //NRF_LOG_INFO("CRC = %0d", crc);
-
-
-  if (!((( ((data_o[0] & 0xFF00) >> 8) + (data_o[0] & 0x00FF) + ((data_o[1] & 0xFF00) >> 8) + (data_o[1] & 0x00FF)) & crc) == crc))
+  if (!((( ((data_o[0] & MSB_MASK) >> SHIFT_TO_LSB) + (data_o[0] & LSB_MASK) + ((data_o[1] & MSB_MASK) >> SHIFT_TO_LSB) + (data_o[1] & LSB_MASK)) & crc) == crc))
   {
     data_o[0] = 0xDEAD;
     data_o[1] = 0xBEEF;
@@ -181,16 +192,21 @@ static void timer1_event_handler(nrf_timer_event_t event_type, void * p_context)
 static void timer2_event_handler(nrf_timer_event_t event_type, void * p_context)
 {
   int * p;
-  NRF_LOG_INFO("Limit Reached");
+  #ifdef DEBUG_MODE
+    NRF_LOG_INFO("Limit Reached");
+  #endif
   nrf_drv_gpiote_uninit();
   bsp_board_led_invert(2);
   p = calculate_humidity_and_temperature(timing_array);
-
-  NRF_LOG_INFO("HUMIDITY = %0d", *p);
-  NRF_LOG_INFO("TEMPERATURE = %0d", *(p + 1));
+  
+  #ifdef DEBUG_MODE
+    NRF_LOG_INFO("HUMIDITY = %0d", *p);
+    NRF_LOG_INFO("TEMPERATURE = %0d", *(p + 1));
+  #endif
 
   nrf_gpio_cfg_output(ONE_WIRE_PIN);
   nrf_gpio_pin_set(ONE_WIRE_PIN);
+
   memset(timing_array, 0, sizeof timing_array);
 }
 
