@@ -54,6 +54,7 @@
 #include "nrf_drv_timer.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_gpiote.h"
+#include "nrf_drv_spi.h"
 #include "bsp.h"
 #include "boards.h"
 #include "app_error.h"
@@ -93,8 +94,16 @@ volatile bool cc0_timeout;
 
 static const nrf_drv_timer_t m_timer1 = NRF_DRV_TIMER_INSTANCE(1);
 static const nrf_drv_timer_t m_timer2 = NRF_DRV_TIMER_INSTANCE(2);
+static const nrf_drv_spi_t   m_spi0 = NRF_DRV_SPI_INSTANCE(0);
+
 static nrf_ppi_channel_t m_ppi_channel1;
 static nrf_ppi_channel_t m_ppi_channel2;
+
+void spi_event_handler(nrf_drv_spi_evt_t const * p_event,
+                       void *                    p_context)
+{
+    NRF_LOG_INFO("Transfer completed.");
+}
 
 static void timer_timeout_handler(void * p_context)
 {
@@ -134,6 +143,7 @@ static int * calculate_humidity_and_temperature( int *input_arr)
 {
   int arr[NUMBER_OF_SAMPLES-1];
   static int data_o[2];
+  static int result[4];
   static int crc;
 
   for(int i = 1; i < NUMBER_OF_SAMPLES; i++)
@@ -171,7 +181,15 @@ static int * calculate_humidity_and_temperature( int *input_arr)
     data_o[1] = 0xBEEF;
   }
 
-  return data_o;
+  NRF_LOG_INFO("HUMIDITY = %0d", data_o[0]);
+  NRF_LOG_INFO("TEMPERATURE = %0d", data_o[1]);
+
+  result[0] = (data_o[0] & MSB_MASK) >> SHIFT_TO_LSB;
+  result[1] = (data_o[0] & LSB_MASK);
+  result[2] = (data_o[1] & MSB_MASK) >> SHIFT_TO_LSB;
+  result[3] = (data_o[1] & LSB_MASK);
+
+  return result;
 }
 
 void TIMER0_IRQHandler(void)
@@ -191,7 +209,12 @@ static void timer1_event_handler(nrf_timer_event_t event_type, void * p_context)
 
 static void timer2_event_handler(nrf_timer_event_t event_type, void * p_context)
 {
+  ret_code_t err_code;
   int * p;
+  uint8_t m_tx_buff[4];
+  uint8_t m_rx_buff[4];
+  uint8_t m_length;
+  
   #ifdef DEBUG_MODE
     NRF_LOG_INFO("Limit Reached");
   #endif
@@ -200,9 +223,27 @@ static void timer2_event_handler(nrf_timer_event_t event_type, void * p_context)
   p = calculate_humidity_and_temperature(timing_array);
   
   #ifdef DEBUG_MODE
-    NRF_LOG_INFO("HUMIDITY = %0d", *p);
-    NRF_LOG_INFO("TEMPERATURE = %0d", *(p + 1));
+    NRF_LOG_INFO("HUMIDITY_MSB = %0d", *p);
+    NRF_LOG_INFO("HUMIDITY_LSB = %0d", *(p + 1));
+    NRF_LOG_INFO("TEMPERATURE_MSB = %0d", *(p + 2));
+    NRF_LOG_INFO("TEMPERATURE_LSB = %0d", *(p + 3));
   #endif
+
+  m_tx_buff[0] = *p;
+  m_tx_buff[1] = *(p + 1);
+  m_tx_buff[2] = *(p + 2);
+  m_tx_buff[3] = *(p + 3);
+  m_length = sizeof(m_tx_buff);
+
+  #ifdef DEBUG_MODE
+    for(int i = 0; i < 4; i++)
+    {
+      NRF_LOG_INFO("m_tx_buff[%0d] = %0d", i, m_tx_buff[i]);
+    }
+  #endif
+
+  err_code = nrf_drv_spi_transfer(&m_spi0, &m_tx_buff, m_length, m_rx_buff, m_length);
+  APP_ERROR_CHECK(err_code);
 
   nrf_gpio_cfg_output(ONE_WIRE_PIN);
   nrf_gpio_pin_set(ONE_WIRE_PIN);
@@ -235,6 +276,20 @@ void set_irq_us (uint32_t irq_time_us)
       __WFE();
     }
     NRF_TIMER0 -> INTENCLR = TIMER_INTENCLR_COMPARE0_Msk;
+}
+
+static void spi_init(void)
+{
+  ret_code_t err_code;
+
+  nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
+  spi_config.ss_pin   = SPI_SS_PIN;
+  spi_config.miso_pin = SPI_MISO_PIN;
+  spi_config.mosi_pin = SPI_MOSI_PIN;
+  spi_config.sck_pin  = SPI_SCK_PIN;
+
+  err_code = nrf_drv_spi_init(&m_spi0, &spi_config, spi_event_handler, NULL);
+  APP_ERROR_CHECK(err_code);
 }
 
 void irq_init(void)
@@ -370,6 +425,7 @@ int main(void)
   nrf_gpio_pin_set(ONE_WIRE_PIN);
   irq_init();
   ppi_init();
+  spi_init();
 
   while (1)
   {
